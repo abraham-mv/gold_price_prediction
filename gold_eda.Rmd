@@ -1,0 +1,71 @@
+---
+title: "Gold Prediction EDA"
+author: "Abraham Morales"
+date: "29/10/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  error = FALSE, 
+  out.width = "100%",
+  fig.width = 10,
+  fig.height = 6.7, 
+  fig.retina = 3,
+  cache = FALSE)
+```
+
+## Gold prediction dataset EDA
+
+This notebook is for the initial exploration and analysis of the gold prediction dataset downloaded from kaggle (url: )
+
+```{r include = F, echo=FALSE}
+options(warn = -1)
+library(tidyverse)
+library(GGally)
+library(ggcorrplot)
+library(lubridate)
+```
+```{r echo=FALSE}
+Gold <- read.csv("https://raw.githubusercontent.com/abraham-mv/gold_price_prediction/main/data/FINAL_USO.csv")
+attach(Gold)
+print(dim(Gold));print(colnames(Gold))
+```
+We have 1718 observations and 81 columns. Now we can check for null values.
+```{r}
+Gold$Date <- as.Date(Gold$Date)
+Gold %>% summarise_all(~ sum(is.na(.)))
+```
+```{r}
+head(Gold)
+```
+We know that the first columns: Open, High, Low, Close, Adj.Close and Volume are for gold. The other assets have similar variables, but these are labeled first, such as SP_open, DJ_close, etc. Now let's run a quick summary of our data.
+```{r}
+summary(Gold)
+```
+It appears that the variables with suffix Trend are categorical, coded as 0 and 1. We should confirm this as follows:
+```{r}
+Gold <- Gold %>% mutate_if(grepl( "Trend" , names( Gold ) ), as.factor) 
+summary(Gold[, grepl( "Trend" , names( Gold ) )])
+```
+However we can see that the variable `RHO_price` has minimum value of zero, which doesn't make a lot of sense.
+```{r}
+plot.ts(RHO_PRICE)
+```
+From the summary it doesn't seem like other variables have zeros.
+```{r}
+colSums(Gold[, !grepl("Trend" , names( Gold ) )]==0)
+```
+`RHO_Price` is the only variable with zeros, other than the binary ones. We could exclude this covariate from the analysis, however, it's trend is easily spottable, so we could estimate missing values with simple interpolation, or use smoothing techniques such as splines, kernel or a moving average filter. 
+```{r}
+ggplot(Gold, aes(x = Date, y = Adj.Close)) + 
+  geom_line(aes(color = "Gold Low")) +
+  #geom_line(data = Gold, aes(x = Date, y = SP_close, color = "High")) +
+  labs(color = "Legend") 
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
