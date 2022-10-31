@@ -29,6 +29,7 @@ library(tidyverse)
 library(GGally)
 library(ggcorrplot)
 library(lubridate)
+library(cowplot)
 ```
 ```{r echo=FALSE}
 Gold <- read.csv("https://raw.githubusercontent.com/abraham-mv/gold_price_prediction/main/data/FINAL_USO.csv")
@@ -54,13 +55,21 @@ summary(Gold[, grepl( "Trend" , names( Gold ) )])
 ```
 However we can see that the variable `RHO_price` has minimum value of zero, which doesn't make a lot of sense.
 ```{r}
-plot.ts(RHO_PRICE)
+ggplot(Gold, aes(x = Date, y = RHO_PRICE)) + geom_line()
 ```
 From the summary it doesn't seem like other variables have zeros.
 ```{r}
 colSums(Gold[, !grepl("Trend" , names( Gold ) )]==0)
 ```
-`RHO_Price` is the only variable with zeros, other than the binary ones. We could exclude this covariate from the analysis, however, it's trend is easily spottable, so we could estimate missing values with simple interpolation, or use smoothing techniques such as splines, kernel or a moving average filter. 
+`RHO_Price` is the only variable with zeros, other than the binary ones. We could exclude this covariate from the analysis, however, it's trend is easily spottable, so we could estimate missing values with simple interpolation, or use smoothing techniques such as splines, kernel or a moving average filter. \ 
+Let's take a few plots from our time series data
+```{r}
+Gold_close <- Gold[, grepl("Close" , names( Gold ) )]
+Gold_close$Date <- as.Date(Date)
+meltdf <- melt(Gold_close,id="Date")
+ggplot(meltdf,aes(x=Date,y=value,colour=variable,group=variable)) + geom_line() + facet_wrap(~variable)
+```
+
 ```{r}
 ggplot(Gold, aes(x = Date, y = Adj.Close)) + 
   geom_line(aes(color = "Gold Low")) +
