@@ -1,0 +1,118 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  error = FALSE, 
+  out.width = "100%",
+  fig.width = 10,
+  fig.height = 6.7, 
+  fig.retina = 3,
+  cache = FALSE)
+```
+
+```{r include = F, echo=FALSE}
+options(warn = -1)
+library(tidyverse)
+library(GGally)
+library(ggcorrplot)
+library(lubridate)
+library(reshape2)
+library(scales)
+```
+\newpage
+# Methods of Applied Statistics I (STA2101F): Project   
+# Gold prediction dataset EDA
+## Abraham Morales
+
+  (a)  Create a new `R project` for your final project. Create a new `R markdown` file to start recording the steps in your analysis.  Write some code that reads your data into `R` from the original website where you obtained it, or from your own website that you create. (This is so I will be able to run your `.Rmd` file without actually storing your data on my computer.) 
+  The `R project` for this project is saved to the github repository: [abraham-mv/gold_price_prediction](https://github.com/abraham-mv/gold_price_prediction).
+  (b)  Load your data and do some quick quality checks -- are there any missing values? If so, how many? How will you handle them in the analysis? 
+```{r echo=FALSE}
+Gold <- read.csv("https://raw.githubusercontent.com/abraham-mv/gold_price_prediction/main/data/FINAL_USO.csv")
+attach(Gold)
+print(dim(Gold));print(colnames(Gold))
+```
+  We have 1718 observations and 81 columns. This columns correspond to different assets and indexes from the stock market. For example, the columns labeled as "SP" and "DJ" correspond to the Standard & Poor's and Dow Jones stock market indexes respectively, while "USO" refers to the United States Oil Fund. We know that the first columns: Open, High, Low, Close, Adj.Close and Volume are for gold, we'll take "Adj.Close" as our dependent variable. This data was collected from December 2011 to December 2018. \
+  We convert the `Date` column to date format and check for null values.  
+```{r}
+Gold$Date <- as.Date(Gold$Date) # Convert Date column to date format
+table(is.na(Gold))
+```  
+  No values labeled as "NA" in the dataframe; however, there could still be labeled as zero. Since we are working with time series financial data, in doesn't make sense to have values at zero.
+```{r include = F}
+summary(Gold)
+head(Gold)
+```
+\newpage
+We can run a quick summary of some of the columns, just to show some inconsistencies in the data.
+```{r include = T}
+summary(Gold)[,c(1,6,12, 30, 36, 42, 63, 80)]
+```
+It appears that the variables with suffix Trend are categorical, coded as 0 and 1. We should confirm this as follows:
+```{r}
+Gold <- Gold %>% mutate_if(grepl( "Trend" , names( Gold ) ), as.factor) 
+summary(Gold[, grepl( "Trend" , names( Gold ) )])
+```  
+  (c) Construct some preliminary plots of the data, for example histograms, boxplots, and/or scatterplots, and comment on any anomalies.  
+We can see that the variable `RHO_price` has minimum value of zero, which doesn't make a lot of sense.
+```{r fig.height=4, fig.width=8}
+ggplot(Gold, aes(x = Date, y = RHO_PRICE)) + 
+  geom_line() +
+  scale_y_continuous(labels=dollar_format()) + 
+  theme_minimal() + 
+  theme(panel.border=element_rect(fill=NA, colour="grey40")) + 
+  ylab("") + ggtitle("Price of Rhodium")
+```
+```{r include = F}
+colSums(Gold[, !grepl("Trend" , names( Gold ) )]==0)
+```
+`RHO_Price` is the only variable with zeros, other than the binary ones. We could exclude this covariate from the analysis, however, its trend is easily spottable, so we could estimate missing values with simple interpolation, or use smoothing techniques such as splines, kernel or a moving average filter. Let's take a few plots from our time series data.
+```{r fig.height=30, fig.width=22}
+toMatch <- c("Adj.Close", "Ajclose")
+Gold_close <- Gold[, grepl(paste(toMatch, collapse = "|") , names( Gold ) )]
+Gold_close$Date <- as.Date(Date)
+
+
+Gold_close %>% 
+  melt(id="Date", variable.name = "Legend") %>% 
+  ggplot(aes(x=Date,y=value)) + 
+  geom_line(ylab = "", size = 0.8) + 
+  scale_y_continuous(labels=dollar_format()) +
+  facet_wrap(~Legend, scales = "free_y", ncol = 1) +
+  theme_minimal(base_size = 20) +
+  theme(strip.text = element_text(size = 22), 
+        axis.text=element_text(size=20), 
+        axis.title=element_text(size=22),
+        panel.border=element_rect(fill=NA, colour="grey40")) +
+  guides(colour=FALSE) + ylab("")
+```
+\newpage
+Let's take correlation plots for the price covariates.
+```{r, fig.width=15, fig.height=10}
+ggpairs(Gold[ , grepl( "Price" , names( Gold ) )])
+```
+We can see that there are a few covariates that are highly correlated; for example, the price of USDI and EU show a correlation of -0.971, the prices of OS and OF show a correlation of 0.986. To deal with this issue, we could ignore one of those two variables that show high correlation, since they wouldn't add any valuable information to the model.
+
+```{r include = F, fig.height=5}
+par(mfrow = c(1,2), mar = c(2,3,3,2))
+y_diff <- diff(Adj.Close)
+acf(y_diff)
+pacf(y_diff)
+```
+```{r include = FALSE}
+plot.ts(diff(log(Adj.Close)))
+```
+
+
+```{r include = F}
+ggplot(Gold, aes(x = Date, y = Adj.Close)) + 
+  geom_line(aes(color = "Gold Low")) +
+  #geom_line(data = Gold, aes(x = Date, y = SP_close, color = "High")) +
+  labs(color = "Legend") 
+```
