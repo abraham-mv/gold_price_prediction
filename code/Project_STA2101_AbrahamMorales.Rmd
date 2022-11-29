@@ -1,0 +1,53 @@
+---
+title: "Gold Price Prediction with multivariate time series analysis"
+author: "Abraham Morales"
+date: "28/11/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r library, include=FALSE}
+options(warn = -1)
+library(tidyverse)
+library(reshape2)
+library(forecast)
+```
+
+\subsection{Scientific Problem}
+Gold is one the most useful and stable assets in the market today. For years it was used as a standard monetary system. In a highly volatile market economy, gold is usually seen as a stable and valuable commodity. The price gold and its daily returns have been the center of study for many economic investigations. It has also been used to test state of the art machine learning and statistical models, due to it's usability and iterpretability.
+
+\subsection{Data Collection}
+The data was collected from the yahoo finance website, from November 2011 to January, 2019. 
+
+```{r echo=FALSE}
+Gold <- read.csv("https://raw.githubusercontent.com/abraham-mv/gold_price_prediction/main/data/FINAL_USO.csv")
+attach(Gold)
+print(dim(Gold));print(colnames(Gold))
+```
+```{r}
+plot.ts(diff(log(Adj.Close)))
+```
+```{r}
+par(mfrow = c(1,2))
+acf(diff(log(Adj.Close)))
+pacf(diff(log(Adj.Close)))
+```
+```{r}
+arima1 <- auto.arima(log(Adj.Close), seasonal = T, trace = T, allowdrift = T)
+summary(arima1)
+```
+```{r}
+arima2 <- Arima(log(Adj.Close), order = c(1,1,0), xreg = log(SP_Ajclose) )
+summary(arima2)
+```
+```{r fig.height = 10}
+tsdiag(arima2)
+```
+
+```{r}
+plot(forecast(arima1, 4))
+```
+
+
