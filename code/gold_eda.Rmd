@@ -97,7 +97,30 @@ Let's take correlation plots for the price covariates.
 ```{r, fig.width=15, fig.height=10}
 ggpairs(Gold[ , grepl( "Price" , names( Gold ) )])
 ```
-We can see that there are a few covariates that are highly correlated; for example, the price of USDI and EU show a correlation of -0.971, the prices of OS and OF show a correlation of 0.986. To deal with this issue, we could ignore one of those two variables that show high correlation, since they wouldn't add any valuable information to the model.
+We can see that there are a few covariates that are highly correlated; for example, the price of USDI and EU show a correlation of -0.971, the prices of OS and OF show a correlation of 0.986. To deal with this issue, we could ignore one of those two variables that show high correlation, since they wouldn't add any valuable information to the model. \
+\
+For financial data is usually better to look at the log returns.
+```{r}
+gold_df <- Gold[,1:7] %>% mutate(Close_lag = lag(Adj.Close),
+                                 log.ret = log(Adj.Close) - log(Close_lag))
+head(gold_df)
+```
+```{r}
+prefix <- array()
+i = 1
+for (col in colnames(Gold)){
+  prefix[i] <- sub("\\_.*", "", col)  
+  i = i + 1
+}
+
+for (code in unique(prefix)){
+  temp_df <- Gold[, grepl( code , names( Gold ) )]
+  
+}
+
+
+```
+
 
 ```{r include = F, fig.height=5}
 par(mfrow = c(1,2), mar = c(2,3,3,2))
