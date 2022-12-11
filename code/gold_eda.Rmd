@@ -18,12 +18,16 @@ knitr::opts_chunk$set(
 
 ```{r include = F, echo=FALSE}
 options(warn = -1)
+
+Sys.setlocale("LC_ALL", "English")
+
 library(tidyverse)
 library(GGally)
 library(ggcorrplot)
 library(lubridate)
 library(reshape2)
 library(scales)
+library(gridExtra)
 ```
 \newpage
 # Methods of Applied Statistics I (STA2101F): Project   
@@ -98,14 +102,67 @@ Let's take correlation plots for the price covariates.
 ggpairs(Gold[ , grepl( "Price" , names( Gold ) )])
 ```
 We can see that there are a few covariates that are highly correlated; for example, the price of USDI and EU show a correlation of -0.971, the prices of OS and OF show a correlation of 0.986. To deal with this issue, we could ignore one of those two variables that show high correlation, since they wouldn't add any valuable information to the model. \
+It will also be of interest to explore how the price of certain assets vary depending on the day of the week, month or quarter, therefore, we will create factor covariates for these three:
+```{r}
+Gold["Date_years"] <- as.factor(year(Gold$Date))
+Gold["Date_quarters"] <- factor(quarters(Gold$Date), levels = c("Q1","Q2","Q3","Q4"))
+Gold["Date_months"] <- as.factor(months(Gold$Date))
+Gold["Date_weekdays"] <- factor(weekdays(Gold$Date), 
+                                levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+```
 \
 For financial data is usually better to look at the log returns.
 ```{r}
-gold_df <- Gold[,1:7] %>% mutate(Close_lag = lag(Adj.Close),
+gold_df <- Gold[,c(1:7, 82:85)] %>% mutate(Close_lag = lag(Adj.Close),
                                  log.ret = log(Adj.Close) - log(Close_lag))
 head(gold_df)
 ```
+
 ```{r}
+
+p1 <- ggplot(gold_df) + geom_line(aes(x = Date, y = Adj.Close)) + theme_bw() +
+  labs(y = "Closing Price", x = "") + 
+  scale_x_date(date_labels="%b\n%Y", 
+               breaks = seq(as.Date("2012-01-01"), as.Date("2019-02-01"), by="6 months"))
+
+p2 <- ggplot(gold_df) + geom_line(aes(x = Date, y = log.ret)) + theme_bw() +
+  labs(y = "Log returns", x = "") + 
+  scale_x_date(date_labels="%b\n%Y", 
+               breaks = seq(as.Date("2012-01-01"), as.Date("2019-02-01"), by="6 months"))
+
+grid.arrange(p1, p2, nrow = 2, top = "Gold Price")
+```
+From the log returns plot we can clearly see high periods of volatility around April 2012. The series appears to become much more stable from after July 2016. \
+
+
+
+```{r}
+p1 <- gold_df %>% 
+  arrange(Date_weekdays) %>% 
+  ggplot() + 
+  geom_boxplot(aes(y = log.ret, 
+                   x = factor(Date_weekdays, 
+                              levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")), 
+                   fill = Date_weekdays), 
+               na.rm = T) +
+  xlab("") + theme(legend.position = "none")
+
+p2 <- gold_df %>% 
+  ggplot() + 
+  geom_boxplot(aes(y = log.ret, 
+                   x = Date_quarters, 
+                   fill = Date_quarters), 
+               na.rm = T) +
+  xlab("") + theme(legend.position = "none")
+
+grid.arrange(p1, p2, nrow = 1)
+```
+
+
+Now we will build separate data frames for each type of asset that is going to be analyzed, as well as, create a log returns columns for each one of them.
+
+```{r}
+# Extract the code of the asset before the underscore
 prefix <- array()
 i = 1
 for (col in colnames(Gold)){
@@ -113,12 +170,45 @@ for (col in colnames(Gold)){
   i = i + 1
 }
 
-for (code in unique(prefix)){
-  temp_df <- Gold[, grepl( code , names( Gold ) )]
+## Create a Vector of Data Frames
+
+toMatch <- c("Adj.Close", "Ajclose", "Price") # The important covariates to extract
+#Initialize vector of Data Frames
+data_map <- vector('list', length(unique(prefix)[-(1:7)]))
+for (code in unique(prefix)[-(2:7)]){
+  temp_df <- Gold[, grepl( code , names( Gold ) )] # Get the columns for the specific code
   
+  if (code != "Date" & code != "RHO"){ #Exclude Date and RHO
+    cols <- grepl(paste(toMatch, collapse = "|") , names( temp_df ) ) # Important covariates
+    temp_df["log.ret"] <- log(temp_df[cols]) - log(lag(temp_df[cols]))  # Calculate log returns
+  }
+  
+  data_map[[code]] <- temp_df # Store dataframe in vector
 }
 
+```
 
+```{r}
+# Create a dataframe with the log returns of each asset
+log_ret_df <- gold_df["Date"]
+for (code in unique( prefix[ -c(2:7) ] ) ){
+  if (code != "Date" & code != "RHO"){
+    log_ret_df[code] <- data_map[[code]]$log.ret    
+  }
+}
+log_ret_df["Gold"] <- gold_df$log.ret
+```
+
+Now we can create a pairs plot for the log returns
+```{r fig.height=10}
+ggpairs(log_ret_df[, -1])
+```
+```{r}
+cor_mat <- cor(na.exclude(log_ret_df[, -1]))
+ggcorrplot(cor_mat)
+```
+```{r}
+weekdays(data_map$Date)[1:5]
 ```
 
 
