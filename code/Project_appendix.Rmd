@@ -1,0 +1,127 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  error = FALSE, 
+  out.width = "100%",
+  fig.width = 10,
+  fig.height = 6.7, 
+  fig.retina = 3,
+  cache = FALSE)
+```
+
+```{r include = F, echo=FALSE}
+options(warn = -1)
+
+Sys.setlocale("LC_ALL", "English")
+
+library(tidyverse)
+library(GGally)
+library(ggcorrplot)
+library(lubridate)
+library(reshape2)
+library(gridExtra)
+library(forecast)
+library(quantmod)
+library(tseries)
+library(FinTS)
+```
+\centering \Large Methods of Applied Statistics I (STA2101F): Project Appendix 1  \
+\centering \large Abraham Morales \
+\vspace{5mm}
+First we load the data into the R environment, using the `quantmod` package.
+```{r data, include = T, echo=TRUE}
+options(warn = -1)
+today <- as.Date("2022-12-15") # Date
+
+symbols <- c("GLD",   # Gold price
+             "^DJI",  # Dow Jones Index
+             "^GSPC", # SP500 index
+             "GDX", # Vaneck Gold Miners ETF
+             "SF", # Stifel Financial Corp
+             "USB", # US Bancorp stock
+             "PL%3DF", # Platinum price
+             "SI%3DF", # Silver Price
+             "BZ%3DF", # Brent Crude oil
+             "USO", #US oil fund
+             "EURUSD=X") # Euro/Dollar exchange
+
+loadSymbols(symbols, from = today - 365*7, to = today)
+```
+Now we convert the GLD xts to a Dataframe object. And Add the variable of log returns, which we will be focusing on.
+```{r}
+GLD$log.ret <- diff(log(GLD$GLD.Adjusted))
+GLD <- GLD %>% 
+   as.data.frame %>% 
+   rownames_to_column("Date")
+GLD$Date <- as.Date(GLD$Date)
+```
+
+Create a plot of the adjusted closing price of gold and its daily returns.
+```{r}
+p1 <- ggplot(GLD) + geom_line(aes(x = Date, y = GLD.Adjusted)) + theme_bw() +
+  labs(y = "Closing Price", x = "") + 
+  scale_x_date(date_labels="%b\n%Y", 
+               breaks = seq(as.Date("2016-01-01"), as.Date("2022-12-14"), by="6 months"))
+
+p2 <- ggplot(GLD) + geom_line(aes(x = Date, y = log.ret)) + theme_bw() +
+  labs(y = "Log returns", x = "") + 
+  scale_x_date(date_labels="%b\n%Y", 
+               breaks = seq(as.Date("2016-01-01"), as.Date("2022-12-14"), by="6 months"))
+
+grid.arrange(p1, p2, nrow = 2)
+```
+```{r}
+table(is.na(`SI%3DF`))
+```
+
+
+
+From the log returns plot, it is evident that we have non constant variance. There are periods of high volatility during the year 2016, and then again during 2020, probably due to the pandemic, it's also important to note that the series looks much more volatile after 2020, than before. \
+Now let's built a data frame with the log returs of each series.
+```{r}
+dim(`PL%3DF`)
+```
+```{r}
+results = lapply(setNames(ls(), ls()), function(i) {
+  x = get(i)
+  if(is.xts(x)) {
+    diff(log(x[,6]))
+  }
+})
+
+results = results[!sapply(results, is.null)]
+```
+```{r}
+head(results[["GDX"]])
+head(coredata(results[["GDX"]]))
+```
+```{r}
+log_ret_df <- data.frame(Date = GLD$Date)
+log_ret_df$GOLD <- GLD$log.ret
+
+for (code in symbols){
+  log_ret_df[code] <- coredata(results[[code]])
+}
+```
+
+
+```{r}
+ArchTest(GLD$log.ret)
+```
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
